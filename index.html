@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Poker Planner</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div class="background-animation">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+    </div>
+
+    <div class="container" id="app">
+        <!-- Home Screen -->
+        <div id="home-screen" class="screen view-active glass-panel">
+            <h1>Poker Planner</h1>
+            <p>A simple, P2P estimation tool built for teams.</p>
+            
+            <div class="actions">
+                <div class="name-container">
+                    <label for="input-display-name">Display Name</label>
+                    <input type="text" id="input-display-name" placeholder="Enter your name" maxlength="20" />
+                </div>
+                <div class="divider"></div>
+                <button id="btn-create-room" class="btn primary">Create Room</button>
+                <div class="divider"><span>OR</span></div>
+                <div class="join-container">
+                    <input type="text" id="input-room-id" placeholder="Enter Room ID" />
+                    <button id="btn-join-room" class="btn secondary">Join Room</button>
+                </div>
+            </div>
+            <div id="connection-error" class="error-msg hidden"></div>
+        </div>
+
+        <!-- Host Screen -->
+        <div id="host-screen" class="screen hidden">
+            <div class="header glass-panel">
+                <div class="room-info">
+                    <h2>Host Panel</h2>
+                    <div class="room-id-badge">
+                        <span>Room ID: <strong id="display-room-id">Loading...</strong></span>
+                        <button id="btn-copy-room" class="icon-btn" title="Copy Room ID">Copy</button>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button id="btn-reveal" class="btn warning" disabled>Force Reveal</button>
+                    <button id="btn-reset" class="btn danger" disabled>Reset Vote</button>
+                    <button id="btn-sort" class="btn outline" disabled>Sort Votes</button>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="participant-grid glass-panel" id="host-participants">
+                    <!-- Participant cards will go here -->
+                </div>
+                
+                <div class="stats-panel glass-panel hidden" id="stats-panel">
+                    <h3>Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <span class="stat-label">Mean</span>
+                            <span class="stat-value" id="stat-mean">-</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Standard Deviation</span>
+                            <span class="stat-value" id="stat-stddev">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Screen -->
+        <div id="client-screen" class="screen hidden">
+            <div class="header glass-panel">
+                <h2>Estimator View</h2>
+                <div class="status-badge" id="client-status">Connected to <span id="client-room-display"></span></div>
+            </div>
+
+            <div class="deck-container glass-panel">
+                <h3>Select your estimate</h3>
+                <div class="cards-grid" id="deck">
+                    <!-- Cards will be populated here -->
+                </div>
+            </div>
+            
+            <div class="vote-status glass-panel hidden" id="client-vote-status">
+                <h3>Your vote is submitted</h3>
+                <div class="selected-card-preview" id="client-selected-card"></div>
+                <p>Waiting for others...</p>
+                <button id="btn-change-vote" class="btn outline" style="margin: 0 auto;">Change Vote</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="overlay hidden glass-panel">
+        <div class="loader"></div>
+        <p id="loading-text">Connecting...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
