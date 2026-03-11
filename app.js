@@ -85,30 +85,47 @@ function generateRoomId() {
 }
 
 // PeerJS Initialization
+// PeerJS Initialization
 function getIceServers() {
+    // These placeholders are replaced during GitHub Actions deployment.
+    // To test with TURN locally, you can set window.TURN_CONFIG in your browser console:
+    // window.TURN_CONFIG = { username: '...', credential: '...' };
+    let username = "__TURN_USERNAME__";
+    let credential = "__TURN_CREDENTIAL__";
+
+    // Fallback for local development if placeholders are not replaced
+    if (username.startsWith("__") && window.TURN_CONFIG) {
+        username = window.TURN_CONFIG.username;
+        credential = window.TURN_CONFIG.credential;
+    }
+
+    if (username.startsWith("__")) {
+        console.warn("ICE Server credentials not configured. TURN/Relay mode will fail. (Placeholders detected)");
+    }
+
     return [
         {
           urls: "stun:stun.relay.metered.ca:80",
         },
         {
           urls: "turn:standard.relay.metered.ca:80",
-          username: "__TURN_USERNAME__",
-          credential: "__TURN_CREDENTIAL__",
+          username: username,
+          credential: credential,
         },
         {
           urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-          username: "__TURN_USERNAME__",
-          credential: "__TURN_CREDENTIAL__",
+          username: username,
+          credential: credential,
         },
         {
           urls: "turn:standard.relay.metered.ca:443",
-          username: "__TURN_USERNAME__",
-          credential: "__TURN_CREDENTIAL__",
+          username: username,
+          credential: credential,
         },
         {
           urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-          username: "__TURN_USERNAME__",
-          credential: "__TURN_CREDENTIAL__",
+          username: username,
+          credential: credential,
         },
     ];
 }
