@@ -205,6 +205,18 @@ input[type="text"]:focus { border-color: var(--primary); }
     border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.1);
 }
 
+.participant-card.disconnected {
+    opacity: 0.5;
+    filter: grayscale(80%);
+}
+
+.participant-card.disconnected .participant-name::after {
+    content: " (offline)";
+    font-size: 0.8em;
+    font-style: italic;
+    color: var(--warning);
+}
+
 .participant-card .vote-display {
     width: 60px; height: 90px; border-radius: 8px; background: rgba(0, 0, 0, 0.3);
     border: 2px dashed rgba(255, 255, 255, 0.1); display: flex; align-items: center;

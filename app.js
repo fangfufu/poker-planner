@@ -7,10 +7,12 @@ const state = {
     connection: null, // Used by client
     isHost: false,
     roomId: null,
-    clients: {}, // { peerId: { name: string, conn: DataConnection } }
-    votes: {}, // { peerId: voteValue }
+    clients: {}, // { clientId: { name: string, conn: DataConnection, disconnected: boolean } }
+    peerToClient: {}, // { peerId: clientId } map to look up clientId by connection peerId
+    votes: {}, // { clientId: voteValue }
     votingState: 'VOTING', // 'VOTING' | 'REVEALED'
-    myName: ''
+    myName: '',
+    myClientId: ''
 };
 
 // DOM Elements - Screens
@@ -50,6 +52,15 @@ const elements = {
 };
 
 // Helper Functions
+function getClientId() {
+    let clientId = localStorage.getItem('poker_planner_client_id');
+    if (!clientId) {
+        clientId = 'client_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('poker_planner_client_id', clientId);
+    }
+    return clientId;
+}
+
 function showScreen(screenName) {
     Object.values(screens).forEach(s => {
         s.classList.remove('view-active');
@@ -166,6 +177,7 @@ async function hostCreateRoom() {
     const name = elements.inputDisplayName.value.trim() || 'Host';
     state.myName = name;
     localStorage.setItem('poker_planner_name', name);
+    state.myClientId = getClientId();
 
     showLoading('Creating Room...');
     try {
@@ -175,7 +187,7 @@ async function hostCreateRoom() {
         state.roomId = generatedId;
         
         // Host is also a participant
-        state.clients[state.peer.id] = { name: `${name} (You)`, conn: 'self' };
+        state.clients[state.myClientId] = { name: `${name} (You)`, conn: 'self', disconnected: false };
         
         setupHostListeners();
         updateHostUI();
@@ -211,8 +223,12 @@ function setupHostListeners() {
         
         conn.on('close', () => {
             console.log('Connection closed:', conn.peer);
-            delete state.clients[conn.peer];
-            delete state.votes[conn.peer];
+            const clientId = state.peerToClient[conn.peer];
+            if (clientId && state.clients[clientId]) {
+                state.clients[clientId].disconnected = true;
+                state.clients[clientId].conn = null;
+            }
+            delete state.peerToClient[conn.peer];
             updateHostUI();
             checkAutoReveal();
             broadcastState(); // Update others about participants
@@ -224,17 +240,25 @@ function handleHostReceivedData(conn, data) {
     console.log('Host received:', data);
     
     if (data.type === 'HELLO') {
-        state.clients[conn.peer] = { name: data.name || `User ${conn.peer.substring(0,4)}`, conn: conn };
+        const clientId = data.clientId || conn.peer;
+        state.peerToClient[conn.peer] = clientId;
+        state.clients[clientId] = { 
+            name: data.name || `User ${conn.peer.substring(0,4)}`, 
+            conn: conn,
+            disconnected: false
+        };
         // Reply with current state
         conn.send({
             type: 'STATE_SYNC',
             votingState: state.votingState,
-            participants: getParticipantList()
+            participants: getParticipantList(),
+            yourVote: state.votes[clientId]
         });
         updateHostUI();
         broadcastState();
     } else if (data.type === 'VOTE' && state.votingState === 'VOTING') {
-        state.votes[conn.peer] = data.vote;
+        const clientId = state.peerToClient[conn.peer] || conn.peer;
+        state.votes[clientId] = data.vote;
         updateHostUI();
         checkAutoReveal();
     }
@@ -249,7 +273,7 @@ function broadcastState() {
     };
     
     Object.values(state.clients).forEach(client => {
-        if (client.conn !== 'self' && client.conn.open) {
+        if (client.conn && client.conn !== 'self' && client.conn.open) {
             client.conn.send(payload);
         }
     });
@@ -257,12 +281,13 @@ function broadcastState() {
 
 function getParticipantList() {
     // Only send who is in the room and if they have voted. Don't reveal votes unless state is REVEALED.
-    return Object.keys(state.clients).map(peerId => {
+    return Object.keys(state.clients).map(clientId => {
         return {
-            id: peerId,
-            name: state.clients[peerId].name,
-            hasVoted: state.votes[peerId] !== undefined,
-            vote: state.votingState === 'REVEALED' ? state.votes[peerId] : null
+            id: clientId,
+            name: state.clients[clientId].name,
+            hasVoted: state.votes[clientId] !== undefined,
+            vote: state.votingState === 'REVEALED' ? state.votes[clientId] : null,
+            disconnected: state.clients[clientId].disconnected
         };
     });
 }
@@ -270,10 +295,12 @@ function getParticipantList() {
 function checkAutoReveal() {
     if (state.votingState === 'REVEALED') return;
     
-    const clientCount = Object.keys(state.clients).length;
-    const voteCount = Object.keys(state.votes).length;
+    const activeClients = Object.keys(state.clients).filter(id => !state.clients[id].disconnected);
+    const activeClientCount = activeClients.length;
     
-    if (clientCount > 0 && voteCount === clientCount) {
+    const activeVoteCount = activeClients.filter(id => state.votes[id] !== undefined).length;
+    
+    if (activeClientCount > 0 && activeVoteCount === activeClientCount) {
         revealVotes();
     }
 }
@@ -335,7 +362,8 @@ function updateHostUI(sortBy = null) {
     let parts = Object.keys(state.clients).map(id => ({
         id: id,
         name: state.clients[id].name,
-        vote: state.votes[id]
+        vote: state.votes[id],
+        disconnected: state.clients[id].disconnected
     }));
     
     if (sortBy === 'vote' && state.votingState === 'REVEALED') {
@@ -354,6 +382,7 @@ function updateHostUI(sortBy = null) {
         card.className = 'participant-card';
         if (p.vote !== undefined) card.classList.add('has-voted');
         if (state.votingState === 'REVEALED') card.classList.add('revealed');
+        if (p.disconnected) card.classList.add('disconnected');
         
         let displayVote = '?';
         if (state.votingState === 'REVEALED' && p.vote !== undefined) {
@@ -400,7 +429,7 @@ function appendHostDeck() {
             c.classList.add('selected');
             
             // Register host vote
-            state.votes[state.peer.id] = val;
+            state.votes[state.myClientId] = val;
             updateHostUI();
             checkAutoReveal();
         };
@@ -431,6 +460,7 @@ async function clientJoinRoom(targetRoomId) {
     const name = elements.inputDisplayName.value.trim() || `User ${Math.floor(Math.random()*1000)}`;
     state.myName = name;
     localStorage.setItem('poker_planner_name', name);
+    state.myClientId = getClientId();
 
     targetRoomId = targetRoomId.toUpperCase().trim();
     
@@ -449,7 +479,8 @@ async function clientJoinRoom(targetRoomId) {
             // Say hello to register
             state.connection.send({
                 type: 'HELLO',
-                name: state.myName
+                name: state.myName,
+                clientId: state.myClientId
             });
             
             renderClientDeck();
@@ -502,6 +533,17 @@ function handleClientReceivedData(data) {
         if (state.votingState === 'REVEALED') {
             // Re-show deck container just to say "round over", but we hide the cards
             elements.deck.style.display = 'none';
+        }
+        
+        if (state.votingState === 'VOTING' && data.yourVote !== undefined) {
+            elements.clientSelectedCard.textContent = data.yourVote;
+            elements.deck.style.display = 'none';
+            elements.clientVoteStatus.classList.remove('hidden');
+            
+            document.querySelectorAll('#deck .poker-card').forEach(cb => {
+                if (cb.textContent === data.yourVote) cb.classList.add('selected');
+                else cb.classList.remove('selected');
+            });
         }
     }
 }
