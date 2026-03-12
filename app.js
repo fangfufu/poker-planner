@@ -116,15 +116,7 @@ function getIceServers() {
 
     return [
         {
-          urls: "stun:stun.relay.metered.ca:80",
-        },
-        {
-          urls: "turn:standard.relay.metered.ca:80",
-          username: username,
-          credential: credential,
-        },
-        {
-          urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+          urls: "turns:standard.relay.metered.ca:443?transport=tcp",
           username: username,
           credential: credential,
         },
@@ -134,10 +126,18 @@ function getIceServers() {
           credential: credential,
         },
         {
-          urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+          urls: "turn:standard.relay.metered.ca:80?transport=tcp",
           username: username,
           credential: credential,
         },
+        {
+          urls: "turn:standard.relay.metered.ca:80",
+          username: username,
+          credential: credential,
+        },
+        {
+          urls: "stun:stun.relay.metered.ca:80",
+        }
     ];
 }
 
