@@ -1,5 +1,6 @@
 // Constants
 const DECK = ['0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5.5', '6', '7', '?', '🔄'];
+const MAX_DISPLAY_NAME_LENGTH = 20;
 
 // App State
 const state = {
@@ -84,6 +85,19 @@ function generateRoomId() {
     return result;
 }
 
+function normalizeDisplayName(name, fallbackName) {
+    if (typeof name !== 'string') return fallbackName;
+    const normalized = name
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, MAX_DISPLAY_NAME_LENGTH);
+    return normalized || fallbackName;
+}
+
+function isValidVote(vote) {
+    return DECK.includes(String(vote));
+}
+
 // PeerJS Initialization
 // PeerJS Initialization
 function getIceServers() {
@@ -163,7 +177,7 @@ async function initPeer(id = null) {
 // --- HOST LOGIC ---
 
 async function hostCreateRoom() {
-    const name = elements.inputDisplayName.value.trim() || 'Host';
+    const name = normalizeDisplayName(elements.inputDisplayName.value, 'Host');
     state.myName = name;
     localStorage.setItem('poker_planner_name', name);
 
@@ -224,7 +238,10 @@ function handleHostReceivedData(conn, data) {
     console.log('Host received:', data);
     
     if (data.type === 'HELLO') {
-        state.clients[conn.peer] = { name: data.name || `User ${conn.peer.substring(0,4)}`, conn: conn };
+        state.clients[conn.peer] = {
+            name: normalizeDisplayName(data.name, `User ${conn.peer.substring(0,4)}`),
+            conn: conn
+        };
         // Reply with current state
         conn.send({
             type: 'STATE_SYNC',
@@ -234,7 +251,11 @@ function handleHostReceivedData(conn, data) {
         updateHostUI();
         broadcastState();
     } else if (data.type === 'VOTE' && state.votingState === 'VOTING') {
-        state.votes[conn.peer] = data.vote;
+        if (!isValidVote(data.vote)) {
+            console.warn(`Ignoring invalid vote from ${conn.peer}:`, data.vote);
+            return;
+        }
+        state.votes[conn.peer] = String(data.vote);
         updateHostUI();
         checkAutoReveal();
     }
@@ -364,11 +385,18 @@ function updateHostUI(sortBy = null) {
             displayVote = '...';
             card.classList.remove('has-voted');
         }
-        
-        card.innerHTML = `
-            <div class="vote-display">${displayVote}</div>
-            <div class="participant-name" title="${p.name}">${p.name}</div>
-        `;
+
+        const voteDisplay = document.createElement('div');
+        voteDisplay.className = 'vote-display';
+        voteDisplay.textContent = displayVote;
+
+        const participantName = document.createElement('div');
+        participantName.className = 'participant-name';
+        participantName.title = p.name;
+        participantName.textContent = p.name;
+
+        card.appendChild(voteDisplay);
+        card.appendChild(participantName);
         elements.hostParticipants.appendChild(card);
     });
     
@@ -428,7 +456,10 @@ elements.btnCopyRoom.onclick = () => {
 async function clientJoinRoom(targetRoomId) {
     if (!targetRoomId) return showError('Please enter a Room ID');
     
-    const name = elements.inputDisplayName.value.trim() || `User ${Math.floor(Math.random()*1000)}`;
+    const name = normalizeDisplayName(
+        elements.inputDisplayName.value,
+        `User ${Math.floor(Math.random()*1000)}`
+    );
     state.myName = name;
     localStorage.setItem('poker_planner_name', name);
 
