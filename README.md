@@ -2,6 +2,8 @@
 
 A modern, peer-to-peer (P2P) agile estimation tool designed for remote teams who value privacy, speed, and a premium user experience. No servers, no registration, just pure peer-to-peer planning.
 
+**Live Demo: [https://fangfufu.github.io/poker-planner/](https://fangfufu.github.io/poker-planner/)**
+
 ## ✨ Features
 
 - **🚀 Serverless P2P**: Uses WebRTC (via PeerJS) for direct browser-to-browser communication. Your data never touches a backend.
