@@ -262,12 +262,16 @@ function handleHostReceivedData(conn, data) {
             disconnected: false
         };
         // Reply with current state
-        conn.send({
+        const syncPayload = {
             type: 'STATE_SYNC',
             votingState: state.votingState,
-            participants: getParticipantList(),
-            yourVote: state.votes[clientId]
-        });
+            participants: getParticipantList()
+        };
+        // Only include yourVote if the client actually has a vote recorded
+        if (state.votes[clientId] !== undefined) {
+            syncPayload.yourVote = state.votes[clientId];
+        }
+        conn.send(syncPayload);
         updateHostUI();
         broadcastState();
     } else if (data.type === 'VOTE' && state.votingState === 'VOTING') {
